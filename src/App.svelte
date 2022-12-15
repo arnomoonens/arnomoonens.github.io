@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import About from './About.svelte';
   import Work from './Work.svelte';
 
@@ -17,7 +17,7 @@
   const delay = 325;
   let locked = false;
 
-  function hashHasValue(v) {
+  function hashHasValue(v: string): boolean {
 	return v !== '' && v !== '#';
   }
 
@@ -28,8 +28,8 @@
 	  }
   }
 
-  function handleWindowKeyup(event) {
-	if (event.keyCode == 27 && bodyIsArticleVisible) {
+  function handleWindowKeyup(event: KeyboardEvent) {
+	if (event.key == 'Escape' && bodyIsArticleVisible) {
 		hideArticle(true);
 	}
   }
@@ -45,7 +45,7 @@
 	hideArticle(true);
   }
 
-function showArticle(x, initial) {
+function showArticle(x: string, initial: boolean) {
 	let component = components[x];
 	if (locked || (typeof initial != 'undefined' && initial === true)) {
 		bodyIsSwitching = true;
@@ -86,7 +86,7 @@ function showArticle(x, initial) {
 	}
 }
 
-  function hideArticle(addState) {
+  function hideArticle(addState: boolean) {
 	if (!bodyIsArticleVisible) {
 		return;
 	}
