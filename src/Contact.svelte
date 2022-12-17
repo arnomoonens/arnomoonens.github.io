@@ -1,12 +1,18 @@
 <script>
-  import { each } from 'svelte/internal';
     import Page from './Page.svelte';
 
     const socials = [
         { icon: 'twitter', 'url': 'https://twitter.com/AMoonens'},
         { icon: 'github', 'url': 'https://github.com/arnomoonens'},
         { icon: 'linkedin', 'url': 'https://www.linkedin.com/in/arnomoonens'},
-    ]
+    ];
+
+    let name = '';
+    let email = '';
+    let message = '';
+
+    $: disabled = (name == '') || (email == '') || (message == '');
+
 </script>
 
 <Page on:close>
@@ -15,19 +21,22 @@
         <div class="fields">
             <div class="field half">
                 <label for="name">Name</label>
-                <input type="text" name="name" id="name" />
+                <input type="text" name="name" id="name" bind:value={name}/>
             </div>
             <div class="field half">
                 <label for="email">Email</label>
-                <input type="email" name="_replyto" id="email" />
+                <input type="email" name="_replyto" id="email" bind:value={email} />
             </div>
             <div class="field">
                 <label for="message">Message</label>
-                <textarea name="message" id="message" rows="4"></textarea>
+                <textarea name="message" id="message" rows="4" bind:value={message}></textarea>
             </div>
         </div>
+        {#if disabled}
+            <p>Please fill in all the fields before submitting.</p>
+        {/if}
         <ul class="actions">
-            <li><input type="submit" value="Send Message" class="primary" /></li>
+            <li><input type="submit" {disabled} value="Send Message" class="primary" class:disabled /></li>
             <li><input type="reset" value="Reset" /></li>
         </ul>
     </form>
