@@ -8,7 +8,7 @@
     }
 </script>
 
-<article transition:fade|local="{{ duration: 325 }}" class="active">
+<article transition:fade|local="{{ duration: 325 }}" on:click|stopPropagation class="active">
     <slot></slot>
     <div class="close" on:click|stopPropagation={handleClick}>Close</div>
 </article>
