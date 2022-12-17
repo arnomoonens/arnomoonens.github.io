@@ -26,6 +26,8 @@
 	  if (hashHasValue(location.hash)) {
 		let componentName = location.hash.slice(1);
 		showArticle(componentName, true);
+	  } else {
+		hideArticle(false);
 	  }
   }
 
