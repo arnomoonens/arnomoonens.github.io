@@ -141,7 +141,7 @@ function showArticle(x: string, initial: boolean) {
 
 <svelte:window on:load={handleWindowLoad} on:hashchange={handleHashChange} on:keyup={handleWindowKeyup}/>
 
-<div id="body" class:is-preload={bodyPreload} class:is-article-visible={bodyIsArticleVisible} class:is-switching={bodyIsSwitching} on:click={handleBodyClick}>
+<div id="body" class:is-preload={bodyPreload} class:is-article-visible={bodyIsArticleVisible} class:is-switching={bodyIsSwitching} on:mousedown={handleBodyClick}>
 		<div id="wrapper">
 
 		<!-- Header -->
