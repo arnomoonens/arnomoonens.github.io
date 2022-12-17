@@ -200,10 +200,6 @@ function showArticle(x: string, initial: boolean) {
 				font-size: 2rem;
 			}
 
-.logo img {
-  width: 100%;
-  height: 100%
-}
 
 /* Wrapper */
 
