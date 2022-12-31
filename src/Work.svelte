@@ -1,11 +1,11 @@
 <script>
     import Page from './Page.svelte';
-    import image from './images/evcharging.jpeg';
+    import image from './images/itconsultant.png';
 </script>
 
 <Page on:close>
     <h2 class="major">Work</h2>
-    <span class="image main"><img src={image} alt="Charging electric vehicle" /></span>
+    <span class="image main"><img src={image} alt="IT Consultant (not Arno)" /></span>
     <p>I work at <a href="https://unipartners.be">UniPartners</a>, where I am a data scientist and machine learning engineer.</p>
     <p>As of programming languages, I use Python most of the time, but I also know my way around SQL, C, C++, Bash, HTML, TypeScript and JavaScript.</p>
     <p>When doing data science or building machine learning applications with Python, I use the following packages or tools:</p>
