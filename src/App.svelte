@@ -132,7 +132,6 @@ function showArticle(x: string, initial: boolean) {
 	{name: "About", uri: "about", enabled: true},
 	{name: "Work", uri: "work", enabled: true},
 	{name: "Contact", uri: "contact", enabled: true},
-	{name: "Elements", uri: "elements", enabled: true},
   ]
 
   $: enabledNavItems = navItems.filter(x => x.enabled);
