@@ -1595,7 +1595,7 @@
     openSheet(`<h2>Settings</h2>
       <div class="group"><label class="label" for="key">Claude API key (optional)</label>
       <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" value="${esc(key)}">
-      <p>With a key, <b>Find spots with Claude</b> reads the labels on a map photo, finds the same places on OpenStreetMap and pins them. It costs roughly 5 to 15 cents per map on your API account. The key stays in this browser and is only sent to api.anthropic.com. Create one at console.anthropic.com.</p></div>
+      <p>With a key, <b>Find spots with Claude</b> reads the labels on a map photo, finds the same places on OpenStreetMap and pins them. It costs roughly 10 to 25 cents per map on your API account. The key stays in this browser and is only sent to api.anthropic.com. Create one at console.anthropic.com.</p></div>
       <div class="group"><button class="btn primary" id="key-save">Save</button></div>
       <p>Map data © OpenStreetMap contributors. Imagery © Esri. Maps drawn with Leaflet.</p>`, (b) => {
       b.querySelector('#key-save').onclick = () => { Prefs.set('apiKey', b.querySelector('#key').value.trim()); closeSheet(); toast('Saved'); };
@@ -1840,7 +1840,7 @@ If this isn't a map, or nothing matches, return no matches and say why in note. 
 
   function askKey(then) {
     openSheet(`<h2>Find spots with Claude</h2>
-      <p>Claude reads the labels on your map photo, finds the same places on OpenStreetMap and pins them for you. It runs on your own Claude API key and costs roughly 5 to 15 cents per map.</p>
+      <p>Claude reads the labels on your map photo, finds the same places on OpenStreetMap and pins them for you. It runs on your own Claude API key and costs roughly 10 to 25 cents per map.</p>
       <div class="group"><label class="label" for="key2">Claude API key</label>
       <input type="password" id="key2" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></div>
       <p>The key stays on this phone and is only sent to api.anthropic.com. You can create one at console.anthropic.com.</p>
