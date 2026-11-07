@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1D3A6E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="現在地">
+<meta name="description" content="Photograph any site map (castle, garden, temple grounds) and see where you are on it.">
+<title>Genzaichi</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@700&family=BIZ+UDPGothic:wght@400;700&display=swap">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+/* Layout: one-screen phone app. The photo is the hero; the chrome reads like a Japanese
+   site signboard (indigo board, white type) and the red 現在地 dot is the one loud colour. */
+:root {
+  --bg: #E9EEF3;
+  --surface: #FFFFFF;
+  --surface-2: #F2F5F9;
+  --ink: #13213A;
+  --ink-2: #4B5A72;
+  --line: #CDD6E1;
+  --board: #1D3A6E;
+  --board-2: #2B4E8C;
+  --board-ink: #FFFFFF;
+  --link: #2B4E8C;
+  --here: #E2252B;
+  --pin: #1D3A6E;
+  --pick: #F2B705;
+  --ok: #1E7A4B;
+  --warn: #A35F00;
+  --scrim: rgba(10, 20, 40, 0.55);
+  --canvas-bg: #D5DDE7;
+  --shadow: 0 6px 22px rgba(13, 25, 48, 0.20);
+  --font-ui: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "BIZ UDGothic", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 14px;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1322; --surface: #131D30; --surface-2: #1A2740; --ink: #E6ECF5; --ink-2: #9AA8BF;
+    --line: #2A3852; --board: #17305C; --board-2: #2A4A82; --board-ink: #F2F5FA; --link: #9DB9F0; --here: #FF4A4F;
+    --pin: #3D68B8; --pick: #F5C432; --ok: #4CC488; --warn: #E4A94B; --scrim: rgba(0, 0, 0, 0.62);
+    --canvas-bg: #0E1626; --shadow: 0 6px 22px rgba(0, 0, 0, 0.5); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1322; --surface: #131D30; --surface-2: #1A2740; --ink: #E6ECF5; --ink-2: #9AA8BF;
+  --line: #2A3852; --board: #17305C; --board-2: #2A4A82; --board-ink: #F2F5FA; --link: #9DB9F0; --here: #FF4A4F;
+  --pin: #3D68B8; --pick: #F5C432; --ok: #4CC488; --warn: #E4A94B; --scrim: rgba(0, 0, 0, 0.62);
+  --canvas-bg: #0E1626; --shadow: 0 6px 22px rgba(0, 0, 0, 0.5); color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+  overflow: hidden; overscroll-behavior: none;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--pick); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+/* ---------- home ---------- */
+#home { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.home-head {
+  background: var(--board); color: var(--board-ink);
+  padding: calc(var(--safe-t) + 22px) max(20px, var(--safe-r)) 26px max(20px, var(--safe-l));
+}
+.brand { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand h1 { margin: 0; font-size: 30px; line-height: 1.1; letter-spacing: 0.01em; font-weight: 700; }
+.genzaichi-tag {
+  display: inline-flex; align-items: center; gap: 7px; background: var(--here); color: #fff;
+  padding: 4px 11px 4px 8px; border-radius: 999px; font-weight: 700; font-size: 15px; letter-spacing: 0.08em;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+.genzaichi-tag::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+.home-head p { margin: 10px 0 0; color: color-mix(in srgb, var(--board-ink) 82%, transparent); max-width: 34em; }
+.home-body {
+  display: flex; flex-direction: column; gap: 22px; max-width: 640px; width: 100%; margin: 0 auto;
+  padding: 20px max(16px, var(--safe-r)) calc(var(--safe-b) + 28px) max(16px, var(--safe-l));
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px;
+  padding: 0 18px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface);
+  font-weight: 700; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--board); border-color: var(--board); color: var(--board-ink); }
+.btn.here { background: var(--here); border-color: var(--here); color: #fff; }
+.btn.ghost { background: transparent; }
+.btn.small { min-height: 38px; padding: 0 13px; font-size: 14px; border-radius: 10px; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn-new { width: 100%; min-height: 58px; font-size: 17px; border-radius: 14px; box-shadow: var(--shadow); }
+.section-title { margin: 0 0 10px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 700; }
+.maps { display: flex; flex-direction: column; gap: 10px; }
+.map-card {
+  display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; text-align: left; width: 100%;
+}
+.map-card img { width: 76px; height: 76px; object-fit: cover; border-radius: 9px; background: var(--canvas-bg); display: block; }
+.map-card .t { font-weight: 700; font-size: 16px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.map-card .s { color: var(--ink-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.ok { color: var(--ok); }
+.chip.warn { color: var(--warn); }
+.how { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 16px 14px; }
+.how ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; counter-reset: s; }
+.how li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; counter-increment: s; }
+.how li::before {
+  content: counter(s); width: 28px; height: 28px; border-radius: 50%; background: var(--board); color: var(--board-ink);
+  display: grid; place-items: center; font: 700 14px var(--font-num);
+}
+.how b { display: block; }
+.how span { color: var(--ink-2); font-size: 14px; }
+.home-foot { color: var(--ink-2); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.linkbtn { background: none; border: 0; padding: 6px 0; color: var(--link); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- map screen ---------- */
+#mapscreen { background: var(--canvas-bg); }
+.topbar {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  background: var(--board); color: var(--board-ink); z-index: 20;
+  padding: calc(var(--safe-t) + 6px) max(10px, var(--safe-r)) 8px max(6px, var(--safe-l));
+}
+.iconbtn {
+  width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; border: 0;
+  background: transparent; color: inherit; touch-action: manipulation;
+}
+.iconbtn:active { background: rgba(255, 255, 255, 0.12); }
+.titlebox { min-width: 0; background: none; border: 0; text-align: left; padding: 2px 0; }
+.titlebox .t { font-weight: 700; font-size: 16px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.titlebox .s { font-size: 12.5px; opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg { display: inline-flex; background: rgba(0, 0, 0, 0.22); border-radius: 11px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: inherit; padding: 7px 11px; border-radius: 9px; font-weight: 700; font-size: 13.5px; min-height: 36px; }
+.seg button[aria-pressed="true"] { background: var(--board-ink); color: var(--board); }
+.views { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pane { position: relative; flex: 1 1 50%; min-height: 0; overflow: hidden; }
+.views:not(.split) #realpane { display: none; }
+.views.split #photopane { border-bottom: 2px solid var(--board); }
+@media (orientation: landscape) and (min-aspect-ratio: 4/3) {
+  .views { flex-direction: row; }
+  .views.split #photopane { border-bottom: 0; border-right: 2px solid var(--board); }
+}
+#photo { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; background: var(--canvas-bg); }
+#real { position: absolute; inset: 0; background: var(--canvas-bg); }
+.pane-label {
+  position: absolute; left: max(10px, var(--safe-l)); top: 10px; z-index: 6; pointer-events: none;
+  background: var(--scrim); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+  padding: 3px 9px; border-radius: 999px;
+}
+.cross { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 5; pointer-events: none; }
+.cross::before, .cross::after { content: ""; position: absolute; background: #fff; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.75); }
+.cross::before { width: 34px; height: 2px; left: -17px; top: -1px; }
+.cross::after { width: 2px; height: 34px; left: -1px; top: -17px; }
+.cross span { position: absolute; left: -12px; top: -12px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--pick); box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.6); }
+.float { position: absolute; z-index: 8; display: flex; flex-direction: column; gap: 10px; }
+.fab {
+  width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--surface); color: var(--ink);
+  box-shadow: var(--shadow); display: grid; place-items: center; touch-action: manipulation; position: relative;
+}
+.fab[aria-pressed="true"] { background: var(--board); color: var(--board-ink); }
+.fab .badge { position: absolute; right: -2px; bottom: -2px; font: 700 10px var(--font-ui); background: var(--board); color: var(--board-ink); border-radius: 999px; padding: 1px 5px; }
+#photo-fabs { right: max(12px, var(--safe-r)); bottom: 14px; }
+#real-fabs { right: max(12px, var(--safe-r)); top: 10px; }
+#north-btn svg { transition: transform 0.15s linear; }
+.scalebar { position: absolute; left: max(12px, var(--safe-l)); bottom: 14px; z-index: 6; pointer-events: none; color: #fff; font: 700 11px var(--font-num); text-shadow: 0 0 3px rgba(0, 0, 0, 0.9); }
+.scalebar i { display: block; height: 6px; border: 2px solid #fff; border-top: 0; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); margin-top: 2px; }
+
+/* you-are-here marker on the photo */
+#me { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 4; pointer-events: none; }
+#me .acc { position: absolute; left: -50px; top: -50px; width: 100px; height: 100px; border-radius: 50%; background: color-mix(in srgb, var(--here) 18%, transparent); border: 1.5px solid color-mix(in srgb, var(--here) 70%, transparent); transform-origin: 50% 50%; }
+#me .cone { position: absolute; left: -40px; top: -80px; width: 80px; height: 80px; transform-origin: 40px 80px; }
+#me .dot { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--here); border: 3.5px solid #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); }
+#me .halo { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--here); opacity: 0.5; animation: halo 2s ease-out infinite; }
+#me .lbl { position: absolute; left: 16px; top: -32px; background: var(--here); color: #fff; font-weight: 700; font-size: 12px; letter-spacing: 0.1em; padding: 2px 8px; border-radius: 6px; white-space: nowrap; box-shadow: 0 0 0 1.5px #fff; }
+#me.stale .dot, #me.stale .halo { background: #8a94a6; }
+#me.stale .lbl { background: #8a94a6; }
+@keyframes halo { from { transform: scale(1); opacity: 0.55; } to { transform: scale(3.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #me .halo { animation: none; opacity: 0; } }
+#offmap {
+  position: absolute; z-index: 7; left: 0; top: 0; display: flex; align-items: center; gap: 6px; pointer-events: none;
+  background: var(--here); color: #fff; font: 700 12.5px var(--font-num); padding: 5px 10px 5px 6px; border-radius: 999px; box-shadow: 0 0 0 2px #fff, var(--shadow);
+}
+#offmap svg { width: 18px; height: 18px; }
+
+/* bottom bar */
+.bottombar {
+  background: var(--surface); border-top: 1px solid var(--line); z-index: 20; display: flex; flex-direction: column; gap: 8px;
+  padding: 10px max(12px, var(--safe-r)) calc(var(--safe-b) + 10px) max(12px, var(--safe-l));
+}
+.status { display: flex; align-items: center; gap: 10px; min-height: 22px; font-size: 14px; line-height: 1.45; color: var(--ink-2); text-wrap: pretty; }
+.status .linkbtn { padding: 0; }
+.status b { color: var(--ink); }
+.status .grow { flex: 1; min-width: 0; }
+.actions { display: flex; gap: 8px; align-items: stretch; }
+.actions .btn { flex: 1 1 0; min-width: 0; padding: 0 8px; gap: 7px; }
+.actions .btn.icon { flex: 0 0 auto; width: 48px; padding: 0; }
+.actions .btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.here-word { color: var(--here); font-weight: 700; }
+
+/* sheets */
+.sheet-wrap { position: fixed; inset: 0; z-index: 60; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  width: 100%; max-width: 560px; max-height: 86%; overflow-y: auto; background: var(--surface); color: var(--ink);
+  border-radius: 18px 18px 0 0; box-shadow: var(--shadow);
+  padding: 8px max(18px, var(--safe-r)) calc(var(--safe-b) + 18px) max(18px, var(--safe-l));
+}
+.sheet .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 4px auto 12px; }
+.sheet h2 { margin: 0 0 4px; font-size: 18px; text-wrap: balance; }
+.sheet p { margin: 6px 0; color: var(--ink-2); }
+.sheet .group { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
+.sheet .label { font-size: 12.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); }
+.menu-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 6px; border: 0; border-bottom: 1px solid var(--line); background: none; min-height: 50px; }
+.menu-item:last-child { border-bottom: 0; }
+.menu-item small { display: block; color: var(--ink-2); font-size: 13px; }
+.menu-item.danger { color: var(--here); }
+.radios { display: flex; flex-wrap: wrap; gap: 6px; }
+.radios button { border: 1px solid var(--line); background: var(--surface-2); border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 700; min-height: 40px; }
+.radios button[aria-pressed="true"] { background: var(--board); border-color: var(--board); color: var(--board-ink); }
+input[type="text"], input[type="password"], input[type="search"] {
+  width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; background: var(--surface-2);
+  font-size: 16px;
+}
+input[type="range"] { width: 100%; accent-color: var(--board-2); }
+.pts { display: flex; flex-direction: column; }
+.pt { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.pt .n { width: 30px; height: 30px; border-radius: 50%; background: var(--pin); color: #fff; display: grid; place-items: center; font: 700 13px var(--font-num); border: 0; }
+.pt .n.ai { background: #6D28D9; }
+.pt.off .n { background: #8a94a6; }
+.pt .d { min-width: 0; }
+.pt .d b { font-size: 14.5px; }
+.pt .d small { display: block; color: var(--ink-2); font-size: 12.5px; }
+.pt .err { font: 700 13px var(--font-num); color: var(--ink-2); text-align: right; }
+.pt .err.bad { color: var(--warn); }
+.fitline { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 6px 0 2px; }
+.results { display: flex; flex-direction: column; margin-top: 8px; }
+.results button { text-align: left; padding: 11px 4px; border: 0; border-bottom: 1px solid var(--line); background: none; }
+.results small { display: block; color: var(--ink-2); font-size: 12.5px; }
+
+/* straighten */
+#straighten { background: #0d1522; color: #fff; }
+#st-stage { position: relative; flex: 1; min-height: 0; touch-action: none; }
+#st-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.handle {
+  position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 0; padding: 0; z-index: 3;
+  background: rgba(242, 183, 5, 0.22); box-shadow: inset 0 0 0 2.5px var(--pick); touch-action: none;
+}
+.handle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--pick); }
+#st-loupe { position: absolute; width: 130px; height: 130px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6); pointer-events: none; z-index: 4; background: #000; }
+.st-bar { display: flex; gap: 8px; padding: 12px max(12px, var(--safe-r)) calc(var(--safe-b) + 12px) max(12px, var(--safe-l)); background: #0d1522; }
+.st-bar .btn { flex: 1; background: #1b2638; border-color: #2c3a52; color: #fff; }
+.st-bar .btn.primary { background: var(--pick); border-color: var(--pick); color: #1b1300; }
+.st-tip { padding: calc(var(--safe-t) + 12px) max(16px, var(--safe-r)) 10px max(16px, var(--safe-l)); font-size: 14px; color: #c9d3e3; }
+.st-tip b { color: #fff; }
+
+/* toasts and busy */
+#toast {
+  position: fixed; left: 50%; bottom: calc(var(--safe-b) + 150px); transform: translateX(-50%); z-index: 80; max-width: min(92vw, 460px);
+  background: #101a2c; color: #fff; padding: 10px 16px; border-radius: 12px; box-shadow: var(--shadow); font-size: 14px; text-align: center;
+}
+#toast.top { bottom: auto; top: calc(var(--safe-t) + 14px); }
+#busy { position: fixed; inset: 0; z-index: 90; background: var(--scrim); display: grid; place-items: center; }
+#busy .box { background: var(--surface); color: var(--ink); border-radius: 16px; padding: 18px 22px; display: flex; gap: 14px; align-items: center; box-shadow: var(--shadow); max-width: 86vw; }
+.spinner { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--here); animation: spin 0.9s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#busy .stop { margin-left: 6px; }
+
+/* leaflet bits */
+.leaflet-container { font: 12px var(--font-ui); background: var(--canvas-bg); }
+.leaflet-control-attribution { font-size: 10px; max-width: 70vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.gz-pin { width: 30px; height: 40px; }
+.gz-pin svg { width: 30px; height: 40px; overflow: visible; display: block; }
+.gz-me-map { width: 18px; height: 18px; border-radius: 50%; background: var(--here); border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5); }
+.gz-warp { pointer-events: none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+  <symbol id="i-north" viewBox="0 0 24 24"><path d="M12 3l4.5 15L12 15l-4.5 3z" fill="currentColor" stroke="none"/><path d="M12 3v12" stroke="var(--surface)" stroke-width="0"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-here" viewBox="0 0 24 24"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12h-2" transform="translate(0 -6)"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 4l9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6l-1 1"/><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6l1-1"/></symbol>
+  <symbol id="i-unlink" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6"/><path d="M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-fix" viewBox="0 0 24 24"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><path d="M9.5 10h5M12 7.5v5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12H5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><path d="M6 5l13 2-1 12-12-1z"/><circle cx="6" cy="5" r="1.4" fill="currentColor"/><circle cx="19" cy="7" r="1.4" fill="currentColor"/><circle cx="18" cy="19" r="1.4" fill="currentColor"/><circle cx="6" cy="18" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+</svg>
+
+<!-- HOME -->
+<section id="home" class="screen" aria-label="Saved maps">
+  <header class="home-head">
+    <div class="brand"><span class="genzaichi-tag" lang="ja">現在地</span><h1>Genzaichi</h1></div>
+    <p>Photograph a site map at a castle, garden or temple, and see your own dot on it as you walk.</p>
+  </header>
+  <div class="home-body">
+    <button class="btn primary btn-new" id="new-btn"><svg class="i"><use href="#i-camera"/></svg>New map from photo</button>
+    <div id="maps-wrap" hidden>
+      <h2 class="section-title">Your maps</h2>
+      <div class="maps" id="maps"></div>
+    </div>
+    <div class="how" id="how">
+      <h2 class="section-title">How it works</h2>
+      <ol>
+        <li><div><b>Photograph the map board.</b><span>Straight on is best. Any photo from your library works too.</span></div></li>
+        <li><div><b>Pin two spots.</b><span>Standing at the board? Put the crosshair on its <span lang="ja">現在地</span> (You are here) mark and tap <i>I'm here</i>. Then line up one more spot with the satellite map.</span></div></li>
+        <li><div><b>Walk.</b><span>Your red dot moves across the photo. Add a spot whenever the dot drifts, and the fit gets better.</span></div></li>
+      </ol>
+    </div>
+    <div class="home-foot">
+      <span>Photos and maps stay on this phone, unless you ask Claude to read one.</span>
+      <button class="linkbtn" id="settings-btn">Settings</button>
+    </div>
+  </div>
+</section>
+
+<!-- MAP -->
+<section id="mapscreen" class="screen" hidden aria-label="Map">
+  <header class="topbar">
+    <button class="iconbtn" id="back-btn" aria-label="Back to your maps"><svg class="i"><use href="#i-back"/></svg></button>
+    <button class="titlebox" id="title-btn" aria-label="Rename map"><div class="t" id="map-title">Map</div><div class="s" id="map-sub"></div></button>
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="mode-cal" aria-pressed="true">Pin spots</button>
+      <button id="mode-loc" aria-pressed="false">Walk</button>
+    </div>
+  </header>
+  <div class="views split" id="views">
+    <div class="pane" id="photopane">
+      <canvas id="photo" aria-label="Map photo"></canvas>
+      <div class="pane-label" id="photo-label">Your photo</div>
+      <div class="cross" id="photo-cross"><span></span></div>
+      <div id="me" hidden>
+        <div class="acc"></div>
+        <svg class="cone" viewBox="0 0 80 80" hidden><defs><radialGradient id="cg" cx="40" cy="80" r="80" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E2252B" stop-opacity="0.55"/><stop offset="1" stop-color="#E2252B" stop-opacity="0"/></radialGradient></defs><path d="M40 80 L12 8 A76 76 0 0 1 68 8 Z" fill="url(#cg)"/></svg>
+        <div class="halo"></div><div class="dot"></div><div class="lbl" lang="ja">現在地</div>
+      </div>
+      <div id="offmap" hidden><svg class="i"><use href="#i-arrow"/></svg><span></span></div>
+      <div class="scalebar" id="scalebar" hidden><span></span><i></i></div>
+      <div class="float" id="photo-fabs">
+        <button class="fab" id="north-btn" aria-label="Rotate photo" hidden><svg class="i"><use href="#i-north"/></svg><span class="badge" id="north-badge">N</span></button>
+        <button class="fab" id="follow-btn" aria-label="Keep my dot centred" aria-pressed="false" hidden><svg class="i"><use href="#i-target"/></svg></button>
+        <button class="fab" id="fix-btn" aria-label="My dot is in the wrong place" hidden><svg class="i"><use href="#i-fix"/></svg></button>
+      </div>
+    </div>
+    <div class="pane" id="realpane">
+      <div id="real" aria-label="Satellite map"></div>
+      <div class="pane-label" id="real-label">Real world</div>
+      <div class="cross" id="real-cross"><span></span></div>
+      <div class="float" id="real-fabs">
+        <button class="fab" id="link-btn" aria-label="Move the real map with the photo" aria-pressed="true" hidden><svg class="i"><use href="#i-link"/></svg></button>
+        <button class="fab" id="layer-btn" aria-label="Switch satellite or street map"><svg class="i"><use href="#i-layers"/></svg></button>
+        <button class="fab" id="search-btn" aria-label="Find a place"><svg class="i"><use href="#i-search"/></svg></button>
+      </div>
+    </div>
+  </div>
+  <footer class="bottombar">
+    <div class="status" id="status"><div class="grow" id="status-text">&nbsp;</div></div>
+    <div class="actions" id="cal-actions">
+      <button class="btn icon" id="undo-btn" aria-label="Undo"><svg class="i"><use href="#i-undo"/></svg></button>
+      <button class="btn here" id="here-btn"><svg class="i"><use href="#i-here"/></svg><span>I'm here</span></button>
+      <button class="btn primary" id="match-btn"><svg class="i"><use href="#i-plus"/></svg><span>Pin spot</span></button>
+      <button class="btn icon" id="more-btn" aria-label="More options"><svg class="i"><use href="#i-more"/></svg></button>
+    </div>
+    <div class="actions" id="sel-actions" hidden>
+      <button class="btn" id="sel-done"><svg class="i"><use href="#i-check"/></svg><span>Done</span></button>
+      <button class="btn" id="sel-move"><svg class="i"><use href="#i-target"/></svg><span>Move to crosshairs</span></button>
+      <button class="btn icon" id="sel-toggle" aria-label="Switch this spot off"><svg class="i"><use href="#i-eye"/></svg></button>
+      <button class="btn icon" id="sel-del" aria-label="Delete this spot"><svg class="i"><use href="#i-trash"/></svg></button>
+    </div>
+    <div class="actions" id="fix-actions" hidden>
+      <button class="btn" id="fix-cancel"><svg class="i"><use href="#i-x"/></svg><span>Cancel</span></button>
+      <button class="btn here" id="fix-ok"><svg class="i"><use href="#i-check"/></svg><span>I'm at the crosshair</span></button>
+    </div>
+    <div class="actions" id="loc-actions" hidden>
+      <button class="btn" id="compass-btn" hidden><svg class="i"><use href="#i-north"/></svg><span>Compass</span></button>
+      <button class="btn" id="points-btn"><svg class="i"><use href="#i-list"/></svg><span id="points-label">Spots</span></button>
+      <button class="btn icon" id="more-btn2" aria-label="More options"><svg class="i"><use href="#i-more"/></svg></button>
+    </div>
+  </footer>
+</section>
+
+<!-- STRAIGHTEN -->
+<section id="straighten" class="screen" hidden aria-label="Straighten photo">
+  <div class="st-tip"><b>Drag the four corners onto the map's edges.</b> The photo is then squared up, as if taken straight on.</div>
+  <div id="st-stage">
+    <canvas id="st-canvas"></canvas>
+    <button class="handle" data-i="0" aria-label="Top-left corner"></button>
+    <button class="handle" data-i="1" aria-label="Top-right corner"></button>
+    <button class="handle" data-i="2" aria-label="Bottom-right corner"></button>
+    <button class="handle" data-i="3" aria-label="Bottom-left corner"></button>
+    <canvas id="st-loupe" width="260" height="260" hidden></canvas>
+  </div>
+  <div class="st-bar">
+    <button class="btn" id="st-cancel">Cancel</button>
+    <button class="btn" id="st-reset">Whole photo</button>
+    <button class="btn primary" id="st-apply">Straighten</button>
+  </div>
+</section>
+
+<div id="sheet" class="sheet-wrap" hidden><div class="sheet" role="dialog" aria-modal="true" id="sheet-body"></div></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<div id="busy" hidden><div class="box"><div class="spinner"></div><div id="busy-text">Working…</div><button class="btn small stop" id="busy-stop" hidden>Stop</button></div></div>
+<input type="file" id="file" accept="image/*" hidden>
+
+<script src="vendor/leaflet.js"></script>
+<script src="geo.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
